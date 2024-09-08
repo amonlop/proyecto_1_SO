@@ -200,17 +200,9 @@ void favs_borrar(){
 void favs_ejecutar(int id) {
     for (int i = 0; i < num_favoritos; i++) {
         if (favoritos[i].id == id) {
-            pid_t pid = fork();
-            if (pid == 0) { // Proceso hijo
-                char *args[MAX_ARGS];
-                separador(favoritos[i].comando, args);
-                ejecutar_comando(args); // Ejecuta el comando en un hijo
-                exit(0);
-            } else if (pid > 0) {
-                wait(NULL); // Padre espera a que el hijo termine
-            } else {
-                perror("fork");
-            }
+            char *args[MAX_ARGS];
+            separador(favoritos[i].comando, args);
+            ejecutar_comando(args); // Ejecuta el comando en un hijo
             return;
         }
     }
