@@ -116,21 +116,25 @@ Favorito favoritos[MAX_FAVS];
 int num_favoritos = 0;
 
 
-void favs_agregar(char *comando) { // Agrega un comando a la lista de favoritos.
-
-    for (int i = 0; i < num_favoritos; i++) { // Verifica si ya está en la lista.
+void favs_agregar(char *comando) {
+    if (strlen(comando) == 0) {
+        printf("No se puede agregar un comando vacío a favoritos.\n");
+        return;
+    }
+    for (int i = 0; i < num_favoritos; i++) {
         if (strcmp(favoritos[i].comando, comando) == 0) {
+            printf("El comando ya está en la lista de favoritos.\n");
             return;
         }
     }
-    if (num_favoritos == MAX_FAVS) { // Verifica si ya se llegó al máximo de favoritos. (100)
+    if (num_favoritos == MAX_FAVS) {
         printf("No se pueden agregar más favoritos.\n");
         return;
-    } else {
-        favoritos[num_favoritos].id = num_favoritos + 1;
-        strcpy(favoritos[num_favoritos].comando, comando);
-        num_favoritos++;
     }
+    favoritos[num_favoritos].id = num_favoritos + 1;
+    strcpy(favoritos[num_favoritos].comando, comando);
+    num_favoritos++;
+    printf("Comando agregado a favoritos: %s\n", comando);
 }
 
 void favs_crear(char *path) {
@@ -142,21 +146,29 @@ void favs_crear(char *path) {
     } fclose(file);
 }
 
-void favs_mostrar(){
+void favs_mostrar() {
+    if (num_favoritos == 0) {
+        printf("No hay favoritos guardados.\n");
+        return;
+    }
+    printf("Lista de favoritos:\n");
     for (int i = 0; i < num_favoritos; i++) {
         printf("%d: %s\n", favoritos[i].id, favoritos[i].comando);
     }
 }
 
 void favs_eliminar(char *numeros) {
-    char *numero = strtok(numeros, ",");  // Por el formato que sigue la pauta, "favs eliminar num1,num2,num3,..." separados por ",".
+    char *numero = strtok(numeros, ",");
     while (numero != NULL) {
         int id = atoi(numero);
-        if (num_favoritos == 0) {
-            break;
+        if (id <= 0 || id > num_favoritos) {
+            printf("ID %d no es válido.\n", id);
+            numero = strtok(NULL, ",");
+            continue;
         }
-        for (int i = 0; i < num_favoritos; i++) {  // Pasa por la lista de favoritos y elimina el comando con el mismo id.
+        for (int i = 0; i < num_favoritos; i++) {
             if (favoritos[i].id == id) {
+                printf("Eliminando favorito: %s\n", favoritos[i].comando);
                 for (int j = i; j < num_favoritos - 1; j++) {
                     favoritos[j] = favoritos[j + 1];
                 }
@@ -164,10 +176,10 @@ void favs_eliminar(char *numeros) {
                 break;
             }
         }
-    numero = strtok(NULL, ","); // Sigue con el siguiente número.
+        numero = strtok(NULL, ",");
     }
-    for (int i = 0; i < num_favoritos; i++){
-        favoritos[i].id = i+1;
+    for (int i = 0; i < num_favoritos; i++) {
+        favoritos[i].id = i + 1;
     }
 }
 
@@ -183,15 +195,24 @@ void favs_borrar(){
     num_favoritos = 0;
 }
 
-void favs_ejecutar(int id){
+void favs_ejecutar(int id) {
     for (int i = 0; i < num_favoritos; i++) {
         if (favoritos[i].id == id) {
-            char *args[MAX_ARGS];
-            separador(favoritos[i].comando, args);
-            ejecutar_comando(args);
+            pid_t pid = fork();
+            if (pid == 0) { // Proceso hijo
+                char *args[MAX_ARGS];
+                separador(favoritos[i].comando, args);
+                ejecutar_comando(args); // Ejecuta el comando en un hijo
+                exit(0);
+            } else if (pid > 0) {
+                wait(NULL); // Padre espera a que el hijo termine
+            } else {
+                perror("fork");
+            }
             return;
         }
-    } printf("Comando no encontrado.\n"); // Si no se encuentra el comando, no llegará a return y mostrará esto.
+    }
+    printf("Comando no encontrado.\n");
 }
 
 void favs_cargar(char *path) {
@@ -212,19 +233,20 @@ void favs_cargar(char *path) {
 }
 
 void favs_guardar() {
-    if (strlen(favoritos_path) == 0){
+    if (strlen(favoritos_path) == 0) {
         printf("Todavía no se ha creado un archivo de favoritos.\n");
         return;
     }
-    FILE *file = fopen(favoritos_path, "r+");
+    FILE *file = fopen(favoritos_path, "w"); // Modo 'w' para sobrescribir el archivo
     if (file == NULL) {
         perror("Error al abrir archivo fav");
         return;
     }
     for (int i = 0; i < num_favoritos; i++) {
-        fprintf(file, "%s\n", favoritos[i].comando); // Escribe los comandos de la lista de favoritos en el archivo.
-    } fclose(file);
-
+        fprintf(file, "%s\n", favoritos[i].comando); // Escribe los comandos en el archivo
+    }
+    fclose(file); // Asegura que el archivo se cierra siempre
+    printf("Favoritos se guardo correctamente.\n");
 }
 
 // FIN DE SECCIÓN DE FAVORITOS
