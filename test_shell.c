@@ -305,7 +305,9 @@ void ejecutar_set(char **args) {
 
 int main() {
     char buffer[MAX_LINE];
+    char copybuffer[MAX_LINE];
     char *args[MAX_ARGS];
+
 
     while (1) {
         prompt();
@@ -314,7 +316,7 @@ int main() {
         if (strlen(buffer) == 0) {
             continue; // Caso de que no se ingrese nada.
         }
-
+        strcpy(copybuffer, buffer);
         separador(buffer, args);
 
         if (strcmp(args[0], "exit") == 0) {
@@ -330,7 +332,7 @@ int main() {
             if (rec_pid == 0){
             ejecutar_set(args);
             }
-            favs_agregar(buffer);
+            favs_agregar(copybuffer);
             continue;
         }
 
@@ -382,7 +384,7 @@ int main() {
             }
         } else {
             ejecutar_comando(args);
-            favs_agregar(buffer); // Agrega el comando a la lista de favoritos.
+            favs_agregar(copybuffer); // Agrega el comando a la lista de favoritos.
         }
     }
 
