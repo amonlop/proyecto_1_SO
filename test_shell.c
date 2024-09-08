@@ -32,12 +32,71 @@ void separador(char *buffer, char **args) {
         args[i] = strtok(NULL, " ");
     }
 }
+// SECCIÓN DE RECORDATORIO
 
-void ejecutar_comando(char **args) {
+void sig_handler_recordatorio(int sig) {
+    if(sig == SIGALRM) {
+        printf("\nExpiró el tiempo: %s\n", recordatorio);
+        fflush(stdout);
+        prompt();
+    }
+}
+
+void ejecutar_set(char **args) {
+    if(strcmp(args[0], "set") == 0 && strcmp(args[1], "recordatorio") == 0) {
+        if(args[2] != NULL) {
+            int tiempo_esp = atoi(args[2]);
+
+            if(tiempo_esp <= 0) {
+                fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n Proyecto Shell > $ ");
+                exit(0);
+                return;
+            }
+            if(args[3] != NULL) {
+                strcpy(recordatorio, args[3]);
+                int i = 4;
+                while(args[i] != NULL) {
+                    strcat(recordatorio, " ");
+                    strcat(recordatorio, args[i]);
+                    i++;
+                }
+
+                signal(SIGALRM, sig_handler_recordatorio);
+                alarm(tiempo_esp);
+                pause();
+                exit(0);
+                return;
+            } else {
+                fprintf(stderr, "\nFalta el mensaje de recordatorio \nProyecto Shell > $ ");
+                exit(0);
+                return;
+            }
+        } else {
+            fprintf(stderr, "\nFalta el tiempo de espera \nProyecto Shell > $ ");
+            exit(0);
+            return;
+        }
+    }
+    exit(0);
+    return;
+}
+
+// FIN SECCIÓN RECORDATORIO
+int ejecutar_comando(char **args) {
     int num_pipes = 0;
     int pipe_positions[MAX_ARGS];
     int i = 0;
-
+    if (strcmp(args[0], "set") == 0) {
+        if (args[1] == NULL) {
+            printf("El comando es <<set recordatorio tiempo \"mensaje\">> \n");
+            return -1;
+        }
+        pid_t rec_pid = fork();
+        if (rec_pid == 0) {
+            ejecutar_set(args);
+        }
+        return 0; // Comando "set" manejado
+    }
     // Identifica las posiciones de los pipes.
     while (args[i] != NULL) {
         if (strcmp(args[i], "|") == 0) {
@@ -51,28 +110,27 @@ void ejecutar_comando(char **args) {
     for (i = 0; i < num_pipes; i++) { // Crea las pipes según cantidad de "|"
         if (pipe(pipefd + i * 2) == -1) {
             perror("pipe");
-            exit(EXIT_FAILURE);
+            return -1; // Error al crear la pipe
         }
     }
 
     int j = 0;
     int inicio_cmd = 0;
     pid_t pid;
+    int status = 0;
     for (i = 0; i <= num_pipes; i++) {
         pid = fork();
         if (pid == 0) {
             // Proceso hijo
             if (i != 0) {
-                // Si no es el primer comando: (Primer comando no necesita redirigir
-                // la entrada estándar)
+                // Si no es el primer comando: (Primer comando no necesita redirigir la entrada estándar)
                 if (dup2(pipefd[(i - 1) * 2], STDIN_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
             }
             if (i != num_pipes) {
-                // Si no es el último comando: (Último comando no necesita redirigir
-                // la salida estándar.)
+                // Si no es el último comando: (Último comando no necesita redirigir la salida estándar.)
                 if (dup2(pipefd[i * 2 + 1], STDOUT_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
@@ -91,7 +149,7 @@ void ejecutar_comando(char **args) {
         } else if (pid < 0) {
             // Error con fork.
             perror("fork");
-            exit(EXIT_FAILURE);
+            return -1; // Error al crear el proceso hijo
         }
 
         inicio_cmd = pipe_positions[i] + 1;
@@ -103,10 +161,17 @@ void ejecutar_comando(char **args) {
     }
 
     // Espera a hijos.
+    int exit_status = 0;
     for (i = 0; i <= num_pipes; i++) {
-        wait(NULL);
+        wait(&status);
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+            exit_status = -1; // Uno de los comandos falló
+        }
     }
+
+    return exit_status; // Devuelve 0 si todos los comandos se ejecutaron correctamente, -1 si alguno falló
 }
+
 
 // SECCIÓN DE FAVORITOS
 
@@ -202,17 +267,9 @@ void favs_borrar(){
 void favs_ejecutar(int id) {
     for (int i = 0; i < num_favoritos; i++) {
         if (favoritos[i].id == id) {
-            pid_t pid = fork();
-            if (pid == 0) { // Proceso hijo
-                char *args[MAX_ARGS];
-                separador(favoritos[i].comando, args);
-                ejecutar_comando(args); // Ejecuta el comando en un hijo
-                exit(0);
-            } else if (pid > 0) {
-                wait(NULL); // Padre espera a que el hijo termine
-            } else {
-                perror("fork");
-            }
+            char *args[MAX_ARGS];
+            separador(favoritos[i].comando, args);
+            ejecutar_comando(args); // Ejecuta el comando en un hijo
             return;
         }
     }
@@ -255,53 +312,12 @@ void favs_guardar() {
 
 // FIN DE SECCIÓN DE FAVORITOS
 
-// SECCIÓN DE RECORDATORIO
-
-void sig_handler_recordatorio(int sig) {
-    if(sig == SIGALRM) {
-        printf("\nExpiró el tiempo: %s\n", recordatorio);
-        fflush(stdout);
-    }
-    prompt();
-}
-
-void ejecutar_set(char **args) {
-    if(args[2] != NULL) {
-        int tiempo_esp = atoi(args[2]);
-
-        if(tiempo_esp <= 0) {
-            fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n");
-            exit(1);
-        }
-        if(args[3] != NULL) {
-            strcpy(recordatorio, args[3]);
-            int i = 4;
-            while(args[i] != NULL) {
-                strcat(recordatorio, " ");
-                strcat(recordatorio, args[i]);
-                i++;
-            }
-
-            signal(SIGALRM, sig_handler_recordatorio);
-            alarm(tiempo_esp);
-            pause();
-            exit(0);
-        } else {
-            fprintf(stderr, "\nFalta el mensaje de recordatorio \n");
-            exit(1);
-        }
-    } else {
-        fprintf(stderr, "\nFalta el tiempo de espera \n");
-        exit(1);
-    }
-    return;
-}
-
-// FIN SECCIÓN RECORDATORIO
 
 int main() {
     char buffer[MAX_LINE];
+    char copybuffer[MAX_LINE];
     char *args[MAX_ARGS];
+
 
     while (1) {
         prompt();
@@ -310,25 +326,11 @@ int main() {
         if (strlen(buffer) == 0) {
             continue; // Caso de que no se ingrese nada.
         }
-
+        strcpy(copybuffer, buffer);
         separador(buffer, args);
 
         if (strcmp(args[0], "exit") == 0) {
             break; // Caso en que quiera salir del programa.
-        }
-
-        if(strcmp(args[0], "set") == 0) {
-            if (args[1] == NULL || strcmp(args[1], "recordatorio") != 0) {
-                printf("El comando es <<set recordatorio tiempo \"mensaje\">> \n");
-                continue;
-            }
-            pid_t rec_pid = fork();
-            if (rec_pid == 0){
-                ejecutar_set(args);
-                exit(0);
-            } 
-            favs_agregar(buffer);
-            continue;
         }
 
         if (strcmp(args[0], "favs") == 0) {
@@ -377,9 +379,8 @@ int main() {
             } else {
                 printf("Uso: favs [crear|mostrar|guardar|cargar]\n");
             }
-        } else {
-            ejecutar_comando(args);
-            favs_agregar(buffer); // Agrega el comando a la lista de favoritos.
+        } else if (ejecutar_comando(args) == 0) {
+            favs_agregar(copybuffer); // Agrega el comando a la lista de favoritos.
         }
     }
 
