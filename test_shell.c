@@ -31,12 +31,71 @@ void separador(char *buffer, char **args) {
         args[i] = strtok(NULL, " ");
     }
 }
+// SECCIÓN DE RECORDATORIO
 
+void sig_handler_recordatorio(int sig) {
+    if(sig == SIGALRM) {
+        printf("\nExpiró el tiempo: %s\n", recordatorio);
+        fflush(stdout);
+        prompt();
+    }
+}
+
+void ejecutar_set(char **args) {
+    if(strcmp(args[0], "set") == 0 && strcmp(args[1], "recordatorio") == 0) {
+        if(args[2] != NULL) {
+            int tiempo_esp = atoi(args[2]);
+
+            if(tiempo_esp <= 0) {
+                fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n Proyecto Shell > $ ");
+                exit(0);
+                return;
+            }
+            if(args[3] != NULL) {
+                strcpy(recordatorio, args[3]);
+                int i = 4;
+                while(args[i] != NULL) {
+                    strcat(recordatorio, " ");
+                    strcat(recordatorio, args[i]);
+                    i++;
+                }
+
+                signal(SIGALRM, sig_handler_recordatorio);
+                alarm(tiempo_esp);
+                pause();
+                exit(0);
+                return;
+            } else {
+                fprintf(stderr, "\nFalta el mensaje de recordatorio \nProyecto Shell > $ ");
+                exit(0);
+                return;
+            }
+        } else {
+            fprintf(stderr, "\nFalta el tiempo de espera \nProyecto Shell > $ ");
+            exit(0);
+            return;
+        }
+    }
+    exit(0);
+    return;
+}
+
+// FIN SECCIÓN RECORDATORIO
 int ejecutar_comando(char **args) {
     int num_pipes = 0;
     int pipe_positions[MAX_ARGS];
     int i = 0;
-
+    if (strcmp(args[0], "set") == 0) {
+        if (args[1] == NULL) {
+            printf("El comando es <<set recordatorio tiempo \"mensaje\">> \n");
+            return -1;
+        }
+        pid_t rec_pid = fork();
+        if (rec_pid == 0) {
+            ejecutar_set(args);
+        }
+        return 0; // Comando "set" manejado
+    }
     // Identifica las posiciones de los pipes.
     while (args[i] != NULL) {
         if (strcmp(args[i], "|") == 0) {
@@ -251,55 +310,6 @@ void favs_guardar() {
 
 // FIN DE SECCIÓN DE FAVORITOS
 
-// SECCIÓN DE RECORDATORIO
-
-void sig_handler_recordatorio(int sig) {
-    if(sig == SIGALRM) {
-        printf("\nExpiró el tiempo: %s\n", recordatorio);
-        fflush(stdout);
-    }
-}
-
-void ejecutar_set(char **args) {
-    if(strcmp(args[0], "set") == 0 && strcmp(args[1], "recordatorio") == 0) {
-        if(args[2] != NULL) {
-            int tiempo_esp = atoi(args[2]);
-
-            if(tiempo_esp <= 0) {
-                fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n Proyecto Shell > $ ");
-                exit(0);
-                return;
-            }
-            if(args[3] != NULL) {
-                strcpy(recordatorio, args[3]);
-                int i = 4;
-                while(args[i] != NULL) {
-                    strcat(recordatorio, " ");
-                    strcat(recordatorio, args[i]);
-                    i++;
-                }
-
-                signal(SIGALRM, sig_handler_recordatorio);
-                alarm(tiempo_esp);
-                pause();
-                exit(0);
-                return;
-            } else {
-                fprintf(stderr, "\nFalta el mensaje de recordatorio \nProyecto Shell > $ ");
-                exit(0);
-                return;
-            }
-        } else {
-            fprintf(stderr, "\nFalta el tiempo de espera \nProyecto Shell > $ ");
-            exit(0);
-            return;
-        }
-    }
-    exit(0);
-    return;
-}
-
-// FIN SECCIÓN RECORDATORIO
 
 int main() {
     char buffer[MAX_LINE];
@@ -319,19 +329,6 @@ int main() {
 
         if (strcmp(args[0], "exit") == 0) {
             break; // Caso en que quiera salir del programa.
-        }
-
-        if(strcmp(args[0], "set") == 0) {
-            if (args[1] == NULL) {
-                printf("El comando es <<set recordatorio tiempo \"mensaje\">> \n");
-                continue;
-            }
-            pid_t rec_pid = fork();
-            if (rec_pid == 0){
-            ejecutar_set(args);
-            }
-            favs_agregar(copybuffer);
-            continue;
         }
 
         if (strcmp(args[0], "favs") == 0) {
