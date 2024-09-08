@@ -16,6 +16,7 @@ char recordatorio[MAX_LINE] = "";
 
 void prompt() {
     printf("Proyecto Shell > $ ");
+    fflush(stdout);
 }
 
 void leer_comando(char *buffer) {
@@ -123,12 +124,13 @@ void favs_agregar(char *comando) {
         printf("No se puede agregar un comando vacío a favoritos.\n");
         return;
     }
-    for (int i = 0; i < num_favoritos; i++) {
+    /*for (int i = 0; i < num_favoritos; i++) {
         if (strcmp(favoritos[i].comando, comando) == 0) {
             printf("El comando ya está en la lista de favoritos.\n");
             return;
         }
     }
+    */
     if (num_favoritos == MAX_FAVS) {
         printf("No se pueden agregar más favoritos.\n");
         return;
@@ -248,7 +250,7 @@ void favs_guardar() {
         fprintf(file, "%s\n", favoritos[i].comando); // Escribe los comandos en el archivo
     }
     fclose(file); // Asegura que el archivo se cierra siempre
-    printf("Favoritos se guardo correctamente.\n");
+    printf("Favoritos se guardó correctamente.\n");
 }
 
 // FIN DE SECCIÓN DE FAVORITOS
@@ -260,44 +262,38 @@ void sig_handler_recordatorio(int sig) {
         printf("\nExpiró el tiempo: %s\n", recordatorio);
         fflush(stdout);
     }
+    prompt();
 }
 
 void ejecutar_set(char **args) {
-    if(strcmp(args[0], "set") == 0 && strcmp(args[1], "recordatorio") == 0) {
-        if(args[2] != NULL) {
-            int tiempo_esp = atoi(args[2]);
+    if(args[2] != NULL) {
+        int tiempo_esp = atoi(args[2]);
 
-            if(tiempo_esp <= 0) {
-                fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n Proyecto Shell > $ ");
-                exit(0);
-                return;
-            }
-            if(args[3] != NULL) {
-                strcpy(recordatorio, args[3]);
-                int i = 4;
-                while(args[i] != NULL) {
-                    strcat(recordatorio, " ");
-                    strcat(recordatorio, args[i]);
-                    i++;
-                }
-
-                signal(SIGALRM, sig_handler_recordatorio);
-                alarm(tiempo_esp);
-                pause();
-                exit(0);
-                return;
-            } else {
-                fprintf(stderr, "\nFalta el mensaje de recordatorio \nProyecto Shell > $ ");
-                exit(0);
-                return;
-            }
-        } else {
-            fprintf(stderr, "\nFalta el tiempo de espera \nProyecto Shell > $ ");
-            exit(0);
-            return;
+        if(tiempo_esp <= 0) {
+            fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n");
+            exit(1);
         }
+        if(args[3] != NULL) {
+            strcpy(recordatorio, args[3]);
+            int i = 4;
+            while(args[i] != NULL) {
+                strcat(recordatorio, " ");
+                strcat(recordatorio, args[i]);
+                i++;
+            }
+
+            signal(SIGALRM, sig_handler_recordatorio);
+            alarm(tiempo_esp);
+            pause();
+            exit(0);
+        } else {
+            fprintf(stderr, "\nFalta el mensaje de recordatorio \n");
+            exit(1);
+        }
+    } else {
+        fprintf(stderr, "\nFalta el tiempo de espera \n");
+        exit(1);
     }
-    exit(0);
     return;
 }
 
@@ -322,14 +318,15 @@ int main() {
         }
 
         if(strcmp(args[0], "set") == 0) {
-            if (args[1] == NULL) {
+            if (args[1] == NULL || strcmp(args[1], "recordatorio") != 0) {
                 printf("El comando es <<set recordatorio tiempo \"mensaje\">> \n");
                 continue;
             }
             pid_t rec_pid = fork();
             if (rec_pid == 0){
-            ejecutar_set(args);
-            }
+                ejecutar_set(args);
+                exit(0);
+            } 
             favs_agregar(buffer);
             continue;
         }
