@@ -32,7 +32,7 @@ void separador(char *buffer, char **args) {
     }
 }
 
-void ejecutar_comando(char **args) {
+int ejecutar_comando(char **args) {
     int num_pipes = 0;
     int pipe_positions[MAX_ARGS];
     int i = 0;
@@ -50,28 +50,27 @@ void ejecutar_comando(char **args) {
     for (i = 0; i < num_pipes; i++) { // Crea las pipes según cantidad de "|"
         if (pipe(pipefd + i * 2) == -1) {
             perror("pipe");
-            exit(EXIT_FAILURE);
+            return -1; // Error al crear la pipe
         }
     }
 
     int j = 0;
     int inicio_cmd = 0;
     pid_t pid;
+    int status = 0;
     for (i = 0; i <= num_pipes; i++) {
         pid = fork();
         if (pid == 0) {
             // Proceso hijo
             if (i != 0) {
-                // Si no es el primer comando: (Primer comando no necesita redirigir
-                // la entrada estándar)
+                // Si no es el primer comando: (Primer comando no necesita redirigir la entrada estándar)
                 if (dup2(pipefd[(i - 1) * 2], STDIN_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
             }
             if (i != num_pipes) {
-                // Si no es el último comando: (Último comando no necesita redirigir
-                // la salida estándar.)
+                // Si no es el último comando: (Último comando no necesita redirigir la salida estándar.)
                 if (dup2(pipefd[i * 2 + 1], STDOUT_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
@@ -90,7 +89,7 @@ void ejecutar_comando(char **args) {
         } else if (pid < 0) {
             // Error con fork.
             perror("fork");
-            exit(EXIT_FAILURE);
+            return -1; // Error al crear el proceso hijo
         }
 
         inicio_cmd = pipe_positions[i] + 1;
@@ -102,10 +101,17 @@ void ejecutar_comando(char **args) {
     }
 
     // Espera a hijos.
+    int exit_status = 0;
     for (i = 0; i <= num_pipes; i++) {
-        wait(NULL);
+        wait(&status);
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+            exit_status = -1; // Uno de los comandos falló
+        }
     }
+
+    return exit_status; // Devuelve 0 si todos los comandos se ejecutaron correctamente, -1 si alguno falló
 }
+
 
 // SECCIÓN DE FAVORITOS
 
@@ -374,8 +380,7 @@ int main() {
             } else {
                 printf("Uso: favs [crear|mostrar|guardar|cargar]\n");
             }
-        } else {
-            ejecutar_comando(args);
+        } else if (ejecutar_comando(args) == 0) {
             favs_agregar(copybuffer); // Agrega el comando a la lista de favoritos.
         }
     }
