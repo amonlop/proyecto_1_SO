@@ -4,9 +4,14 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <signal.h>
+#include <sys/time.h>
+#include <sys/types.h>
 
 #define MAX_LINE 1024
 #define MAX_ARGS 100
+
+char recordatorio[MAX_LINE] = "";
 
 void prompt() {
     printf("Proyecto Shell > $ ");
@@ -101,6 +106,50 @@ void ejecutar_comando(char **args) {
     }
 }
 
+void sig_handler_recordatorio(int sig) {
+    if(sig == SIGALRM) {
+        printf("Expiró el tiempo: %s\n", recordatorio);
+        fflush(stdout);
+    }
+}
+
+
+void ejecutar_set(char **args) {
+    if(strcmp(args[0], "set") == 0 && strcmp(args[1], "recordatorio") == 0) {
+        if(args[2] != NULL) {
+            int tiempo_esp = atoi(args[2]);
+
+            if(tiempo_esp <= 0) {
+                fprintf(stderr, "El tiempo de espera debe ser un número positivo \n");
+                return;
+            }
+            if(args[3] != NULL) {
+                strcpy(recordatorio, args[3]);
+                int i = 4;
+                while(args[i] != NULL) {
+                    strcat(recordatorio, " ");
+                    strcat(recordatorio, args[i]);
+                    i++;
+                }
+
+                signal(SIGALRM, sig_handler_recordatorio);
+                alarm(tiempo_esp);
+                pause();
+                return;
+            } else {
+                fprintf(stderr, "Falta el mensaje de recordatorio \n");
+                return;
+            }
+        } else {
+            fprintf(stderr, "Falta el tiempo de espera \n");
+            return;
+        }
+    }
+
+    fprintf(stderr, "Comando no encontrado o argumentos insuficientes. El comando es <<set recordatorio>> \n");
+    return;
+}
+
 int main() {
     char buffer[MAX_LINE];
     char *args[MAX_ARGS];
@@ -117,6 +166,11 @@ int main() {
 
         if (strcmp(args[0], "exit") == 0) {
             break; // Caso en que quiera salir del programa.
+        }
+
+        if(strcmp(args[0], "set") == 0) {
+            ejecutar_set(args);
+            continue;
         }
 
         ejecutar_comando(args);
