@@ -48,7 +48,7 @@ int ejecutar_set(char **args) {
             int tiempo_esp = atoi(args[2]);
 
             if(tiempo_esp <= 0) {
-                fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n Proyecto Shell > $ ");
+                fprintf(stderr, "El tiempo de espera debe ser un número positivo \n");
                 return -1;
             }
             if(args[3] != NULL) {
@@ -65,14 +65,15 @@ int ejecutar_set(char **args) {
                     signal(SIGALRM, sig_handler_recordatorio);
                     alarm(tiempo_esp);
                     pause();
+                    //exit(0);
                 }
                 return 0;
             } else {
-                fprintf(stderr, "\nFalta el mensaje de recordatorio \nProyecto Shell > $ ");
+                fprintf(stderr, "Falta el mensaje de recordatorio \n");
                 return -1;
             }
         } else {
-            fprintf(stderr, "\nFalta el tiempo de espera \nProyecto Shell > $ ");
+            fprintf(stderr, "Falta el tiempo de espera \n");
             return -1;
         }
     }
@@ -85,14 +86,12 @@ int ejecutar_comando(char **args) {
     int pipe_positions[MAX_ARGS];
     int i = 0;
     if (strcmp(args[0], "set") == 0) {
-        if (args[1] == NULL) {
+        if (args[1] == NULL || strcmp(args[1], "recordatorio") != 0) {
             printf("El comando es <<set recordatorio tiempo \"mensaje\">> \n");
             return -1;
         }
-        if(ejecutar_set(args)==0){
-            return 0; // Comando "set" manejado
-        }
-        return -1;
+        
+        return ejecutar_set(args);
     }
     // Identifica las posiciones de los pipes.
     while (args[i] != NULL) {
@@ -140,7 +139,7 @@ int ejecutar_comando(char **args) {
             }
 
             if (execvp(args[inicio_cmd], &args[inicio_cmd]) == -1) {
-                perror("Proyecto Shell >");
+                perror("");
                 exit(EXIT_FAILURE);
             }
         } else if (pid < 0) {
