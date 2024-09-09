@@ -340,7 +340,7 @@ void procesar_favoritos(char **args) {
         favs_guardar();
     } else if (strcmp(args[1], "ejecutar") == 0) {
         if (args[2] == NULL) {
-            printf("Uso: favs ejecutar num (o favs num ejecutar)\n");
+            printf("Uso: favs num ejecutar\n");
             return;
         }
         favs_ejecutar(atoi(args[1]));
