@@ -42,15 +42,14 @@ void sig_handler_recordatorio(int sig) {
     }
 }
 
-void ejecutar_set(char **args) {
+int ejecutar_set(char **args) {
     if(strcmp(args[0], "set") == 0 && strcmp(args[1], "recordatorio") == 0) {
         if(args[2] != NULL) {
             int tiempo_esp = atoi(args[2]);
 
             if(tiempo_esp <= 0) {
                 fprintf(stderr, "\nEl tiempo de espera debe ser un número positivo \n Proyecto Shell > $ ");
-                exit(0);
-                return;
+                return -1;
             }
             if(args[3] != NULL) {
                 strcpy(recordatorio, args[3]);
@@ -60,25 +59,24 @@ void ejecutar_set(char **args) {
                     strcat(recordatorio, args[i]);
                     i++;
                 }
-
-                signal(SIGALRM, sig_handler_recordatorio);
-                alarm(tiempo_esp);
-                pause();
-                exit(0);
-                return;
+                
+                pid_t rec_pid = fork();
+                if (rec_pid == 0) {
+                    signal(SIGALRM, sig_handler_recordatorio);
+                    alarm(tiempo_esp);
+                    pause();
+                }
+                return 0;
             } else {
                 fprintf(stderr, "\nFalta el mensaje de recordatorio \nProyecto Shell > $ ");
-                exit(0);
-                return;
+                return -1;
             }
         } else {
             fprintf(stderr, "\nFalta el tiempo de espera \nProyecto Shell > $ ");
-            exit(0);
-            return;
+            return -1;
         }
     }
-    exit(0);
-    return;
+    return -1;
 }
 
 // FIN SECCIÓN RECORDATORIO
@@ -91,11 +89,10 @@ int ejecutar_comando(char **args) {
             printf("El comando es <<set recordatorio tiempo \"mensaje\">> \n");
             return -1;
         }
-        pid_t rec_pid = fork();
-        if (rec_pid == 0) {
-            ejecutar_set(args);
+        if(ejecutar_set(args)==0){
+            return 0; // Comando "set" manejado
         }
-        return 0; // Comando "set" manejado
+        return -1;
     }
     // Identifica las posiciones de los pipes.
     while (args[i] != NULL) {
@@ -189,13 +186,12 @@ void favs_agregar(char *comando) {
         printf("No se puede agregar un comando vacío a favoritos.\n");
         return;
     }
-    /*for (int i = 0; i < num_favoritos; i++) {
+    for (int i = 0; i < num_favoritos; i++) {
         if (strcmp(favoritos[i].comando, comando) == 0) {
             printf("El comando ya está en la lista de favoritos.\n");
             return;
         }
     }
-    */
     if (num_favoritos == MAX_FAVS) {
         printf("No se pueden agregar más favoritos.\n");
         return;
@@ -269,7 +265,7 @@ void favs_ejecutar(int id) {
         if (favoritos[i].id == id) {
             char *args[MAX_ARGS];
             separador(favoritos[i].comando, args);
-            ejecutar_comando(args); // Ejecuta el comando en un hijo
+            ejecutar_comando(args);
             return;
         }
     }
@@ -310,14 +306,55 @@ void favs_guardar() {
     printf("Favoritos se guardó correctamente.\n");
 }
 
+void procesar_favoritos(char **args) {
+    if (strcmp(args[1], "crear") == 0) {
+        if (args[2] == NULL) {
+            printf("Uso: favs crear ruta/ejemplo.txt\n");
+            return;
+        }
+        favs_crear(args[2]);
+    } else if (strcmp(args[1], "mostrar") == 0) {
+        favs_mostrar();
+    } else if (strcmp(args[1], "eliminar") == 0) {
+        if (args[2] == NULL) {
+            printf("Uso: favs eliminar num1,num2,...\n");
+            return;
+        }
+        favs_eliminar(args[2]);
+    } else if (strcmp(args[1], "buscar") == 0) {
+        if (args[2] == NULL) {
+            printf("Uso: favs buscar comando\n");
+            return;
+        }
+        favs_buscar(args[2]);
+    } else if (strcmp(args[1], "borrar") == 0) {
+        favs_borrar();
+    } else if (args[2] != NULL && strcmp(args[2], "ejecutar") == 0) {
+        favs_ejecutar(atoi(args[1]));
+    } else if (strcmp(args[1], "cargar") == 0) {
+        if (args[2] == NULL) {
+            printf("Uso: favs cargar ruta/ejemplo.txt\n");
+            return;
+        }
+        favs_cargar(args[2]);
+    } else if (strcmp(args[1], "guardar") == 0) {
+        favs_guardar();
+    } else if (strcmp(args[1], "ejecutar") == 0) {
+        if (args[2] == NULL) {
+            printf("Uso: favs ejecutar num (o favs num ejecutar)\n");
+            return;
+        }
+        favs_ejecutar(atoi(args[1]));
+    } else {
+        printf("Uso: favs [crear|mostrar|guardar|cargar]\n");
+    }
+}
 // FIN DE SECCIÓN DE FAVORITOS
-
 
 int main() {
     char buffer[MAX_LINE];
     char copybuffer[MAX_LINE];
     char *args[MAX_ARGS];
-
 
     while (1) {
         prompt();
@@ -330,6 +367,7 @@ int main() {
         separador(buffer, args);
 
         if (strcmp(args[0], "exit") == 0) {
+            exit(0);
             break; // Caso en que quiera salir del programa.
         }
 
@@ -338,47 +376,7 @@ int main() {
                 printf("Uso: favs [crear|mostrar|guardar|cargar]\n");
                 continue;
             }
-            if (strcmp(args[1], "crear") == 0) {
-                if (args[2] == NULL) {
-                    printf("Uso: favs crear ruta/ejemplo.txt\n");
-                    continue;
-                }
-                favs_crear(args[2]);
-            } else if (strcmp(args[1], "mostrar") == 0) {  // favs mostrar: despliega lista de favoritos.
-                favs_mostrar();
-            } else if (strcmp(args[1], "eliminar") == 0) { // favs eliminar num1,num2,num3,...: elimina los favoritos con los números ingresados.
-                if (args[2] == NULL) {
-                    printf("Uso: favs eliminar num1,num2,...\n");
-                    continue;
-                }
-                favs_eliminar(args[2]);
-            } else if (strcmp(args[1], "buscar") == 0) { // favs buscar comando: busca los favoritos que contengan el comando ingresado.
-                if (args[2] == NULL) {
-                    printf("Uso: favs buscar comando\n");
-                    continue;
-                }
-                favs_buscar(args[2]);
-            } else if (strcmp(args[1], "borrar") == 0) { // favs borrar: borra todos los favoritos.
-                favs_borrar();
-            } else if (args[2] != NULL && strcmp(args[2], "ejecutar") == 0) { // favs num ejecutar: ejecuta el favorito con el número ingresado.
-                favs_ejecutar(atoi(args[1]));
-            } else if (strcmp(args[1], "cargar") == 0) { // favs cargar: carga los favoritos guardados en el archivo.
-                if (args[2] == NULL){
-                    printf("Uso: favs cargar ruta/ejemplo.txt\n");
-                    continue;
-                }
-                favs_cargar(args[2]);
-            } else if (strcmp(args[1], "guardar") == 0) { // favs guardar: guarda los favoritos en el archivo.
-                favs_guardar();
-            } else if (strcmp(args[1], "ejecutar") == 0) {
-                if (args[2] == NULL) {
-                    printf("Uso: favs ejecutar num (o favs num ejecutar)\n");
-                    continue;
-                }
-                favs_ejecutar(atoi(args[1]));
-            } else {
-                printf("Uso: favs [crear|mostrar|guardar|cargar]\n");
-            }
+            procesar_favoritos(args);
         } else if (ejecutar_comando(args) == 0) {
             favs_agregar(copybuffer); // Agrega el comando a la lista de favoritos.
         }
